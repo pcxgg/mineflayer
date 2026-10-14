@@ -247,6 +247,41 @@ for (const supportedVersion of mineflayer.testedVersions) {
         })
       })
     })
+    it('entity relative move', function (done) {
+      if (!bot.supportFeature('fixedPointDelta128')) return this.skip()
+      const entities = bot.registry.entitiesByName
+      const creeperId = entities.creeper ? entities.creeper.id : entities.Creeper.id
+      const steppedDelta = bot.registry.protocol.play.toClient.types.packet_rel_entity_move[1].some(f => f.name === 'move')
+      bot.on('entityMoved', (entity) => {
+        if (entity.id !== 8) return
+        try {
+          assert.deepStrictEqual(entity.position, vec3(11, 11, 10))
+          done()
+        } catch (err) {
+          done(err)
+        }
+      })
+      server.on('playerJoin', (client) => {
+        client.write(bot.registry.supportFeature('consolidatedEntitySpawnPacket') ? 'spawn_entity' : 'spawn_entity_living', {
+          entityId: 8,
+          entityUUID: '00112233-4455-6677-8899-aabbccddeeff',
+          objectUUID: '00112233-4455-6677-8899-aabbccddeeff',
+          type: creeperId,
+          x: 10,
+          y: 11,
+          z: 12,
+          yaw: 13,
+          pitch: 14,
+          headPitch: 14,
+          velocity: { x: 15, y: 16, z: 17 },
+          metadata: []
+        })
+        // 26.3+ VecDelta: chained steps in 1/4096 block units; older: one flat dX/dY/dZ
+        client.write('rel_entity_move', steppedDelta
+          ? { entityId: 8, move: { onGround: true, steps: [{ dX: 2048, dY: 0, dZ: -4096, ticks: 1 }, { dX: 2048, dY: 0, dZ: -4096, ticks: 2 }] } }
+          : { entityId: 8, dX: 4096, dY: 0, dZ: -8192, onGround: true })
+      })
+    })
     it('blockAt', (done) => {
       const pos = vec3(1, 65, 1)
       const goldId = bot.registry.blocksByName.gold_block.id
@@ -666,7 +701,7 @@ for (const supportedVersion of mineflayer.testedVersions) {
             // echo assertions on the schema so this test is green before and after
             // the data update, while still pinning the behavior the moment the
             // fields are serializable.
-            const schema = bot.registry.protocol.types.packet_teleport_confirm
+            const schema = (bot.registry.protocol.play?.toServer ?? bot.registry.protocol).types.packet_teleport_confirm
             const schemaNames = Array.isArray(schema) && Array.isArray(schema[1])
               ? schema[1].map(f => f && f.name)
               : []
@@ -2135,10 +2170,12 @@ for (const supportedVersion of mineflayer.testedVersions) {
           await bot.activateBlock(block, vec3(-1, 0, 0))
           try {
             const scale = bot.supportFeature('blockPlaceHasHandAndFloatCursor') || bot.supportFeature('blockPlaceHasInsideBlock') ? 1 : 16
-            assert.deepStrictEqual(writes.map(w => w.name), ['block_place', 'arm_animation', 'block_place', 'arm_animation'])
+            // 26.3+ has no swing packet: the server swings for use_item_on itself
+            const swing = bot.supportFeature('punchReplacesSwingPacket') ? [] : ['arm_animation']
+            assert.deepStrictEqual(writes.map(w => w.name), ['block_place', ...swing, 'block_place', ...swing])
             const cursor = ({ params }) => [params.cursorX / scale, params.cursorY / scale, params.cursorZ / scale, params.direction]
             assert.deepStrictEqual(cursor(writes[0]), [0.5, 1, 0.5, 1])
-            assert.deepStrictEqual(cursor(writes[2]), [0, 0.5, 0.5, 4])
+            assert.deepStrictEqual(cursor(writes.filter(w => w.name === 'block_place')[1]), [0, 0.5, 0.5, 4])
             done()
           } catch (err) {
             done(err)
@@ -2348,7 +2385,8 @@ for (const supportedVersion of mineflayer.testedVersions) {
           bot.inventory.updateSlot(bot.QUICK_BAR_START, new Item(registry.itemsByName.stone.id, 1))
           await bot._genericPlace({ position: vec3(1, 65, 1) }, vec3(0, 1, 0), { forceLook: 'ignore', swingArm: 'right' })
           try {
-            assert.deepStrictEqual(writes, ['block_place', 'arm_animation'])
+            // 26.3+ has no swing packet: the server swings for use_item_on itself
+            assert.deepStrictEqual(writes, bot.supportFeature('punchReplacesSwingPacket') ? ['block_place'] : ['block_place', 'arm_animation'])
             done()
           } catch (err) {
             done(err)
