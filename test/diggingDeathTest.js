@@ -29,6 +29,8 @@ describe('digging plugin death handler', () => {
     bot.getEquipmentDestSlot = () => 5
     bot.swingArm = () => {}
     bot.world = { raycast: () => null }
+    // the plugin picks its player-action ids by version (playerActionHasChangeDestroyDirection)
+    bot.supportFeature = () => false
     return bot
   }
 
