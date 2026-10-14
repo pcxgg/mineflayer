@@ -21,8 +21,8 @@
   },
   "license": "MIT",
   "dependencies": {
-    "minecraft-data": "github:PCX-Network/minecraft-data#bbffdeb97c98d1725787a50fbdae8bca3eabd507",
-    "minecraft-protocol": "github:PCX-Network/node-minecraft-protocol#fa7983cdbc26f8320392d55e1c86e680ba10595c",
+    "minecraft-data": "github:PCX-Network/minecraft-data#e88f978cc3e63d90cf386d0840b2e16479c6f962",
+    "minecraft-protocol": "github:PCX-Network/node-minecraft-protocol#8298cf162f7ca20d892390e1f15f81ea462ff025",
     "mojangson": "^2.0.4",
     "prismarine-biome": "^1.1.1",
     "prismarine-block": "^1.22.0",
